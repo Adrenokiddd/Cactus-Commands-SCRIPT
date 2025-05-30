@@ -1,0 +1,184 @@
+
+-- 🌵 Cactus Commands V.01 Beta (Movable UI + Close Button)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local prefix = "!"
+local ChatService = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+
+-- ✅ Notify helper
+local function notify(msg)
+    pcall(function()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "🌵 Cactus",
+            Text = msg,
+            Duration = 4
+        })
+    end)
+end
+
+-- ✅ Chatbot
+local chatbotOn = false
+local function toggleChatbot()
+    chatbotOn = not chatbotOn
+    notify("Chatbot " .. (chatbotOn and "enabled" or "disabled"))
+
+    coroutine.wrap(function()
+        local lines = {
+            "Cactus AI activated 🌵",
+            "010101001010",
+            "Analyzing target...",
+            "I'm alive?",
+            "Cactus v0.1 ready"
+        }
+
+        while chatbotOn do
+            local msg = lines[math.random(1, #lines)]
+            if ChatService then
+                ChatService.SayMessageRequest:FireServer(msg, "All")
+            end
+            wait(math.random(4, 8))
+        end
+    end)()
+end
+
+-- ✅ Follow player
+local followTarget = nil
+local function followPlayer(name)
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Name:lower():sub(1, #name) == name:lower() then
+            followTarget = p
+            notify("Following " .. p.Name)
+            break
+        end
+    end
+
+    coroutine.wrap(function()
+        while followTarget and followTarget.Character and LocalPlayer.Character do
+            local targetHRP = followTarget.Character:FindFirstChild("HumanoidRootPart")
+            local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if targetHRP and myHRP then
+                myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 2)
+            end
+            wait(0.5)
+        end
+    end)()
+end
+
+-- ✅ GUI command list
+local function showCommandUI()
+    if game.CoreGui:FindFirstChild("CactusCmds") then
+        game.CoreGui.CactusCmds:Destroy()
+    end
+
+    local gui = Instance.new("ScreenGui", game.CoreGui)
+    gui.Name = "CactusCmds"
+    gui.ResetOnSpawn = false
+
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(0, 300, 0, 240)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -120)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Text = "🌵 Cactus Command List"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
+
+    local close = Instance.new("TextButton", frame)
+    close.Size = UDim2.new(0, 30, 0, 30)
+    close.Position = UDim2.new(1, -30, 0, 0)
+    close.Text = "X"
+    close.TextColor3 = Color3.new(1, 1, 1)
+    close.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+    close.Font = Enum.Font.GothamBold
+    close.TextSize = 14
+    close.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
+
+    local cmds = {
+        "!fly - Enable flight",
+        "!speed - Speed boost",
+        "!kill - Reset character",
+        "!follow <name> - Follow player",
+        "!chatbot - Toggle AI chat",
+        "!cmds - Show this window"
+    }
+
+    for i, text in pairs(cmds) do
+        local line = Instance.new("TextLabel", frame)
+        line.Size = UDim2.new(1, -10, 0, 20)
+        line.Position = UDim2.new(0, 5, 0, 35 + (i - 1) * 22)
+        line.BackgroundTransparency = 1
+        line.TextColor3 = Color3.new(1, 1, 1)
+        line.Font = Enum.Font.Code
+        line.TextSize = 14
+        line.TextXAlignment = Enum.TextXAlignment.Left
+        line.Text = text
+    end
+end
+
+-- ✅ Fly
+local flying = false
+local function startFly()
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    flying = true
+
+    local bv = Instance.new("BodyVelocity", hrp)
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bv.Velocity = Vector3.new()
+
+    notify("Flying enabled (press F to stop)")
+
+    game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.F then
+            flying = false
+            bv:Destroy()
+            notify("Flying disabled")
+        end
+    end)
+
+    game:GetService("RunService").Heartbeat:Connect(function()
+        if flying and LocalPlayer and LocalPlayer.Character and bv then
+            bv.Velocity = LocalPlayer:GetMouse().Hit.LookVector * 80
+        end
+    end)
+end
+
+-- ✅ Command parser
+local function handleCommand(msg)
+    local args = msg:lower():split(" ")
+    local cmd = args[1]
+
+    if cmd == prefix.."fly" then
+        startFly()
+    elseif cmd == prefix.."speed" then
+        local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if h then h.WalkSpeed = 100 notify("Speed set") end
+    elseif cmd == prefix.."kill" then
+        if LocalPlayer.Character then LocalPlayer.Character:BreakJoints() end
+    elseif cmd == prefix.."follow" and args[2] then
+        followPlayer(args[2])
+    elseif cmd == prefix.."chatbot" then
+        toggleChatbot()
+    elseif cmd == prefix.."cmds" then
+        showCommandUI()
+    else
+        notify("Unknown or invalid command.")
+    end
+end
+
+-- ✅ Hook chat
+LocalPlayer.Chatted:Connect(handleCommand)
+if ChatService then
+    ChatService.SayMessageRequest:FireServer("🌵 Cactus Commands V.01 Beta active", "All")
+end
+notify("Cactus Admin Loaded (type !cmds)")
